@@ -16,11 +16,6 @@ class color:
   UNDERLINE = '\033[4m'
   END = '\033[0m'
 
-app = Flask(__name__,
-  static_url_path='',
-  template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "views"),
-  static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "public"))
-
 STRIPE_PUBLIC_KEY = os.getenv('STRIPE_PUBLIC_KEY')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
 stripe.api_key = STRIPE_SECRET_KEY
@@ -33,6 +28,13 @@ if not STRIPE_PUBLIC_KEY or not STRIPE_SECRET_KEY:
   print(color.BOLD + color.YELLOW + '\texport STRIPE_PUBLIC_KEY=<stripe publishable key>' + color.END)
   print(color.BOLD + color.YELLOW + '\texport STRIPE_SECRET_KEY=<stripe secret key>' + color.END)
   exit(1)
+
+# -----------------------------------------------
+
+app = Flask(__name__,
+  static_url_path='',
+  template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "views"),
+  static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "public"))
 
 # Home route
 @app.route('/', methods=['GET'])
