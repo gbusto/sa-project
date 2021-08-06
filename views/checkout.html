@@ -1,8 +1,13 @@
-{% extends 'layouts/main.html' %}
+{% extends "layouts/main.html" %}
+
+{% block head %}
+    <script src="https://js.stripe.com/v3/"></script>
+{% endblock %}
 
 {% block content %}
 <div class="row justify-content-md-center">
   <div class="col-6">
+    {% if not error %}
     <div class="text-center mt-40">
       <h1>
         Checkout — Stripe Press
@@ -17,20 +22,162 @@
     </div>
     <div class="card box-shadow mt-40">
       <div class="card-body">
-        <form name="payment-form">
+        <form id="payment-form">
           <div>
             <label for="email">Email address</label>
             <input type="email" class="form-control" id="email" name="email" placeholder="you@email.com">
           </div>
-          <div class="mt-20 text-center text-secondary border-placeholder">
-            Add Stripe Element here!
+          <div id="stripe-elements" class="mt-20 text-center text-secondary border-placeholder">
           </div>
+          <div id="card-errors" role="alert"></div>
           <div class="mt-20">
-            <button type="submit" class="btn btn-lg btn-block btn-primary">Pay $<span class="amount" data-amount="{{ amount }}"></span></button>
+            <button type="submit" id="pay-button" class="btn btn-lg btn-block btn-primary" disabled>
+              Pay $<span class="amount" data-amount="{{ amount }}"></span>
+            </button>
           </div>
         </form>
       </div>
     </div>
+    {% endif %}
   </div>
 </div>
+<script>
+  var stripe = Stripe("{{ public_key }}");
+
+  var form = $("#payment-form");
+
+  var emailInput = $("#email");
+
+  var cardIsComplete = false;
+
+  function showCardError(message) {
+    var errorDiv = $("#card-errors");
+    errorDiv.append('<p class="text-danger">' + message + '</p>');
+  }
+
+  function clearCardError(message) {
+    var errorDiv = $("#card-errors");
+    errorDiv.empty();
+  }
+
+  function disableButton() {
+    $("#pay-button").prop("disabled", true);
+  }
+
+  function enableButton() {
+    $("#pay-button").prop("disabled", false);
+  }
+
+  function resetPayButton() {
+    var button = $("#pay-button");
+    button.html("Retry payment");
+    button.prop("disabled", false);
+  }
+
+  function isEmailValid() {
+    var re = /\w+[@]\w+\.\w{2}/;
+    var text = $("#email").val();
+    return re.exec(text);
+  }
+
+  emailInput.on("input", function(e) {
+    updateAllowPayment();
+  });
+
+  form.on("submit", function(e) {
+    clearCardError();
+
+    if (!inputIsComplete()) {
+      return;
+    }
+    var payButton = $("#pay-button");
+    var email = $("#email").val();
+    e.preventDefault();
+    disableButton();
+    payButton.html('<div class="spinner-border text-light mr-2"><span class="sr-only">Loading...</span></div>Processing Payment...');
+
+    stripe.confirmCardPayment("{{ client_secret }}", {
+      payment_method: {
+        card: card,
+        billing_details: {
+          email: email
+        }
+      }
+    }).then(function(result) {
+      if (result.error) {
+        showCardError(result.error.message);
+        resetPayButton();
+      } else {
+        // The payment has been processed!
+        if (result.paymentIntent.status === 'succeeded') {
+          window.location.href = "/success?pi=" + result.paymentIntent.id;
+        }
+      }
+    });
+  });
+
+  var elements = stripe.elements({
+    fonts: [
+      {
+        cssSrc: "https://rsms.me/inter/inter.css"
+      }
+    ],
+    locale: "auto"
+  });
+
+  /**
+   * Card Element
+   */
+  var card = elements.create("card", {
+    style: {
+      base: {
+        color: "#32325D",
+        fontWeight: 500,
+        fontFamily: "Inter, Open Sans, Segoe UI, sans-serif",
+        fontSize: "16px",
+        fontSmoothing: "antialiased",
+
+        "::placeholder": {
+          color: "#CFD7DF"
+        }
+      },
+      invalid: {
+        color: "#E25950"
+      }
+    }
+  });
+
+  card.on("change", ({complete, error}) => {
+    let displayError = document.getElementById("card-errors");
+    if (error) {
+      displayError.textContent = error.message;
+    } else {
+      displayError.textContent = "";
+    }
+
+    if (complete) {
+      cardIsComplete = true;
+    }
+    else {
+      cardIsComplete = false;
+    }
+
+    updateAllowPayment();
+  });
+
+  function inputIsComplete() {
+    return cardIsComplete && emailInput.val().length > 0 && isEmailValid();
+  }
+
+  function updateAllowPayment() {
+    if (inputIsComplete()) {
+      enableButton();
+    }
+    else {
+      disableButton();
+    }
+  }
+
+  card.mount("#stripe-elements");
+</script>
 {% endblock %}
